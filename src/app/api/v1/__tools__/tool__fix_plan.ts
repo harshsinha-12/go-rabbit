@@ -1,4 +1,5 @@
 import { logger, withSyncToolLogging } from "@/utils";
+import { getPlanningAgentSystemPrompt } from "../__prompts__";
 import OpenAI from "openai";
 import { z } from "zod";
 import type { IssueDifficultyClassification } from "./tool__difficulty";
@@ -65,6 +66,10 @@ export function generateFixPlan({
     { issueTitle, difficulty: difficulty.difficulty },
     () => {
       logger.debug({ issueTitle, difficulty }, "Generating fix plan");
+      logger.debug(
+        { prompt: getPlanningAgentSystemPrompt() },
+        "Using fix plan prompt contract",
+      );
 
       const filesToInspect = Array.from(
         new Set([

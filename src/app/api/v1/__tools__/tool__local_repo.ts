@@ -1,6 +1,7 @@
 import { logger, withToolLogging } from "@/utils";
 import { execFile } from "node:child_process";
 import { mkdir, stat } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import OpenAI from "openai";
@@ -68,7 +69,7 @@ export async function prepareLocalRepository({
     TOOL_PREPARE_LOCAL_REPOSITORY,
     { runId: safeRunId, repositoryUrl, issueNumber },
     async () => {
-      const runPath = path.join(process.cwd(), ".runs", safeRunId);
+      const runPath = path.join(os.tmpdir(), "go-rabbit-runs", safeRunId);
       const repositoryPath = path.join(runPath, "repo");
       const branchName = `go-rabbit/issue-${issueNumber}`;
 

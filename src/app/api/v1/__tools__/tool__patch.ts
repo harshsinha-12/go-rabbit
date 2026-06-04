@@ -1,6 +1,7 @@
 import { DEFAULT_LLM_API_VERSION, GPT_5_2 } from "@/config";
 import { getAIClient } from "@/fetchers";
 import { logger, withToolLogging } from "@/utils";
+import { getPatchSystemPrompt, getPatchUserPrompt } from "../__prompts__";
 import { execFile } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -31,7 +32,7 @@ export const DEF_GENERATE_FOCUSED_PATCH: OpenAI.Chat.Completions.ChatCompletionT
     function: {
       name: TOOL_GENERATE_FOCUSED_PATCH,
       description:
-        "Generates a focused git patch after the human has approved the fix plan.",
+        "Generates a focused, git-apply-valid patch after the human has approved the fix plan. The patch must be grounded only in repository files that were read and must not contain fake index hashes, Markdown fences, no-op hunks, or dependency checksum guesses.",
       parameters: {
         type: "object",
         properties: {
@@ -145,18 +146,93 @@ function normalizeStringArray(value: unknown) {
   return [];
 }
 
+function sanitizePatch(patch: string) {
+  return patch
+    .replace(/^```(?:diff|patch)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .split("\n")
+    .filter(
+      (line) =>
+        line.trim() !== "*** Begin Patch" &&
+        line.trim() !== "*** End Patch" &&
+        line.trim() !== "@@",
+    )
+    .join("\n")
+    .trimEnd()
+    .concat("\n");
+}
+
+function isLikelyUnifiedDiff(patch: string) {
+  const trimmedPatch = sanitizePatch(patch).trim();
+
+  if (!trimmedPatch) {
+    return false;
+  }
+
+  return (
+    trimmedPatch.includes("diff --git ") ||
+    (trimmedPatch.includes("--- ") && trimmedPatch.includes("+++ "))
+  );
+}
+
 function normalizePatchDraft(parsed: unknown) {
   const draft =
     parsed && typeof parsed === "object"
       ? (parsed as Record<string, unknown>)
       : {};
 
+  const patch = sanitizePatch(stringifyModelField(draft.patch));
+
+  if (!isLikelyUnifiedDiff(patch)) {
+    throw new Error(
+      "LLM patch response did not contain a valid unified diff. Return only a real git patch in the patch field.",
+    );
+  }
+
   return PatchDraftSchema.parse({
-    patch: stringifyModelField(draft.patch),
+    patch,
     changedFiles: normalizeStringArray(draft.changedFiles),
     rationale: stringifyModelField(draft.rationale),
     risks: normalizeStringArray(draft.risks),
   });
+}
+
+function getCommandOutput(error: unknown) {
+  if (error && typeof error === "object") {
+    const maybeError = error as { stdout?: unknown; stderr?: unknown; message?: unknown };
+    const stdout = typeof maybeError.stdout === "string" ? maybeError.stdout : "";
+    const stderr = typeof maybeError.stderr === "string" ? maybeError.stderr : "";
+    const message = typeof maybeError.message === "string" ? maybeError.message : "";
+
+    return `${stdout}${stderr}${message ? `\n${message}` : ""}`.trim();
+  }
+
+  return error instanceof Error ? error.message : "Command failed";
+}
+
+async function checkPatchApplies(repositoryPath: string, patch: string) {
+  const tempDirectory = await mkdtemp(path.join(os.tmpdir(), "go-rabbit-"));
+  const patchPath = path.join(tempDirectory, "candidate.patch");
+
+  try {
+    await writeFile(patchPath, sanitizePatch(patch), "utf8");
+    await execFileAsync(
+      "git",
+      ["-C", repositoryPath, "apply", "--recount", "--check", patchPath],
+      {
+        maxBuffer: 1024 * 1024 * 10,
+      },
+    );
+
+    return { ok: true as const, error: "" };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: getCommandOutput(error),
+    };
+  } finally {
+    await rm(tempDirectory, { force: true, recursive: true });
+  }
 }
 
 export async function generateFocusedPatch(input: GenerateFocusedPatchInput) {
@@ -173,32 +249,51 @@ export async function generateFocusedPatch(input: GenerateFocusedPatchInput) {
         input.filesToInspect,
       );
       const client = getAIClient(GPT_5_2, DEFAULT_LLM_API_VERSION);
-      const response = await client.chat.completions.create({
-        model: GPT_5_2,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You generate minimal git patches for Go repositories. Return only JSON with keys patch, changedFiles, rationale, risks. patch must be a unified git diff that git apply can apply.",
-          },
-          {
-            role: "user",
-            content: [
-              `Issue title: ${input.issueTitle}`,
-              `Issue body: ${input.issueBody}`,
-              input.retryFailureLog
-                ? `Previous validation failure:\n${input.retryFailureLog}`
-                : "",
-              `Files/context:\n${context}`,
-            ].join("\n\n"),
-          },
-        ],
-      });
-      const content = response.choices[0]?.message.content ?? "";
-      const parsed = JSON.parse(extractJsonObject(content)) as unknown;
+      let patchFailure = input.retryFailureLog ?? "";
 
-      logger.debug({ contentLength: content.length }, "Generated patch draft");
-      return normalizePatchDraft(parsed);
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        const response = await client.chat.completions.create({
+          model: GPT_5_2,
+          messages: [
+            {
+              role: "system",
+              content: getPatchSystemPrompt(),
+            },
+            {
+              role: "user",
+              content: getPatchUserPrompt({
+                issueTitle: input.issueTitle,
+                issueBody: input.issueBody,
+                patchFailure,
+                context,
+              }),
+            },
+          ],
+        });
+        const content = response.choices[0]?.message.content ?? "";
+        const parsed = JSON.parse(extractJsonObject(content)) as unknown;
+        const draft = normalizePatchDraft(parsed);
+        const patchCheck = await checkPatchApplies(input.repositoryPath, draft.patch);
+
+        logger.debug(
+          {
+            attempt,
+            contentLength: content.length,
+            patchApplies: patchCheck.ok,
+          },
+          "Generated patch draft",
+        );
+
+        if (patchCheck.ok) {
+          return draft;
+        }
+
+        patchFailure = patchCheck.error;
+      }
+
+      throw new Error(
+        `Generated patch did not apply cleanly after retry. Last git apply error:\n${patchFailure}`,
+      );
     },
   );
 }
@@ -219,15 +314,23 @@ export async function applyApprovedPatch({
 
       const tempDirectory = await mkdtemp(path.join(os.tmpdir(), "go-rabbit-"));
       const patchPath = path.join(tempDirectory, "approved.patch");
+      const sanitizedPatch = sanitizePatch(patch);
 
       try {
-        await writeFile(patchPath, patch, "utf8");
-        await execFileAsync("git", ["-C", repositoryPath, "apply", "--check", patchPath], {
-          maxBuffer: 1024 * 1024 * 10,
-        });
-        await execFileAsync("git", ["-C", repositoryPath, "apply", patchPath], {
-          maxBuffer: 1024 * 1024 * 10,
-        });
+        await writeFile(patchPath, sanitizedPatch, "utf8");
+        const patchCheck = await checkPatchApplies(repositoryPath, sanitizedPatch);
+
+        if (!patchCheck.ok) {
+          throw new Error(`Approved patch does not apply cleanly:\n${patchCheck.error}`);
+        }
+
+        await execFileAsync(
+          "git",
+          ["-C", repositoryPath, "apply", "--recount", patchPath],
+          {
+            maxBuffer: 1024 * 1024 * 10,
+          },
+        );
 
         const { stdout: changedFilesOutput } = await execFileAsync(
           "git",

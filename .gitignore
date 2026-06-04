@@ -3,6 +3,7 @@ node_modules
 out
 build
 dist
+.runs
 
 .env
 .env.local

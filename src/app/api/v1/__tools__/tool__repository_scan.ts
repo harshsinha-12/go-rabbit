@@ -1,4 +1,5 @@
 import { logger, withToolLogging } from "@/utils";
+import { getRepositoryScanPrompt } from "../__prompts__";
 import { execFile } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -139,6 +140,10 @@ export async function scanRepositoryForIssue({
     { repositoryPath, issueTitle },
     async () => {
       logger.debug({ repositoryPath, issueTitle }, "Scanning repository for issue");
+      logger.debug(
+        { prompt: getRepositoryScanPrompt() },
+        "Using repository scan prompt contract",
+      );
 
       const codebase = await exploreCodebase({ repositoryPath, maxFiles: 240 });
       const terms = getSearchTerms(issueTitle, issueBody);

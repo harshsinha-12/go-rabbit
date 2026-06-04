@@ -231,6 +231,14 @@ function getForkRecoveryMessage({
   ].join("\n");
 }
 
+function isNonFastForwardPushError(errorOutput: string) {
+  return (
+    errorOutput.includes("fetch first") ||
+    errorOutput.includes("non-fast-forward") ||
+    errorOutput.includes("Updates were rejected")
+  );
+}
+
 async function pushBranchToFork({
   repositoryPath,
   branchName,
@@ -249,6 +257,19 @@ async function pushBranchToFork({
   try {
     await execGit(repositoryPath, ["push", "-u", forkRemoteName, branchName]);
   } catch (error) {
+    const pushError = getCommandOutput(error);
+
+    if (branchName.startsWith("go-rabbit/") && isNonFastForwardPushError(pushError)) {
+      await execGit(repositoryPath, [
+        "push",
+        "--force-with-lease",
+        "-u",
+        forkRemoteName,
+        branchName,
+      ]);
+      return;
+    }
+
     const originRepository = await getOriginRepository(repositoryPath);
     const forkCreationNote = forkError
       ? `\nFork creation through GitHub CLI failed:\n${getCommandOutput(forkError)}`
@@ -265,7 +286,7 @@ async function pushBranchToFork({
         }),
         "",
         "Push error:",
-        getCommandOutput(error),
+        pushError,
         forkCreationNote,
       ]
         .filter(Boolean)

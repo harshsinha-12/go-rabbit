@@ -10,6 +10,7 @@ const GeneratePatchRequestSchema = z.object({
   issueTitle: z.string().min(1),
   issueBody: z.string(),
   filesToInspect: z.array(z.string()).min(1),
+  repositoryTree: z.string().optional(),
   retryFailureLog: z.string().optional(),
 });
 

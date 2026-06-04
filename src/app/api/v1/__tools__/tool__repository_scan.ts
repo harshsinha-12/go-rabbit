@@ -13,6 +13,7 @@ export const TOOL_SCAN_REPOSITORY_FOR_ISSUE = "scanRepositoryForIssue";
 
 export const RepositoryScanSchema = z.object({
   repositoryPath: z.string(),
+  repositoryTree: z.string(),
   relevantFiles: z.array(z.string()),
   relevantTests: z.array(z.string()),
   projectConventions: z.array(z.string()),
@@ -91,6 +92,65 @@ function compactContent(content: string, maxLength = 1200) {
     : content;
 }
 
+function buildRepositoryTree(filePaths: string[], maxLines = 420) {
+  const tree = new Map<string, Set<string>>();
+
+  for (const filePath of filePaths.sort()) {
+    const parts = filePath.split(path.sep);
+    let prefix = "";
+
+    parts.forEach((part, index) => {
+      const key = prefix;
+      const label = index === parts.length - 1 ? part : `${part}/`;
+      const children = tree.get(key) ?? new Set<string>();
+      children.add(label);
+      tree.set(key, children);
+      prefix = prefix ? `${prefix}${path.sep}${part}` : part;
+    });
+  }
+
+  const lines: string[] = [];
+  const render = (prefix: string, depth: number) => {
+    if (lines.length >= maxLines) {
+      return;
+    }
+
+    const children = Array.from(tree.get(prefix) ?? []).sort((a, b) => {
+      const aIsDir = a.endsWith("/");
+      const bIsDir = b.endsWith("/");
+
+      if (aIsDir !== bIsDir) {
+        return aIsDir ? -1 : 1;
+      }
+
+      return a.localeCompare(b);
+    });
+
+    for (const child of children) {
+      if (lines.length >= maxLines) {
+        return;
+      }
+
+      lines.push(`${"  ".repeat(depth)}${child}`);
+
+      if (child.endsWith("/")) {
+        const nextPrefix = prefix
+          ? `${prefix}${path.sep}${child.slice(0, -1)}`
+          : child.slice(0, -1);
+        render(nextPrefix, depth + 1);
+      }
+    }
+  };
+
+  render("", 0);
+
+  if (lines.length >= maxLines) {
+    lines.push("...[tree truncated]");
+  }
+
+  return lines.join("\n");
+}
+
 async function safeRead(repositoryPath: string, filePath: string) {
   try {
     const result = await readRepositoryFile({
@@ -145,12 +205,30 @@ export async function scanRepositoryForIssue({
         "Using repository scan prompt contract",
       );
 
-      const codebase = await exploreCodebase({ repositoryPath, maxFiles: 240 });
+      const codebase = await exploreCodebase({ repositoryPath, maxFiles: 900 });
       const terms = getSearchTerms(issueTitle, issueBody);
       const matchedFiles = await searchRepository(repositoryPath, terms);
+      const packageMatches = matchedFiles
+        .flatMap((filePath) => {
+          const directory = path.dirname(filePath);
+
+          if (directory === "." || directory === "") {
+            return [];
+          }
+
+          return codebase.files
+            .map((file) => file.path)
+            .filter(
+              (candidate) =>
+                path.dirname(candidate) === directory &&
+                /\.(go|md)$/.test(candidate),
+            );
+        })
+        .slice(0, 60);
       const relevantTests = Array.from(
         new Set([
           ...matchedFiles.filter((filePath) => /_test\.go$/.test(filePath)),
+          ...packageMatches.filter((filePath) => /_test\.go$/.test(filePath)),
           ...codebase.groupedFiles.test.slice(0, 15),
         ]),
       ).slice(0, 20);
@@ -158,6 +236,7 @@ export async function scanRepositoryForIssue({
       const relevantFiles = Array.from(
         new Set([
           ...matchedFiles.filter((filePath) => !/_test\.go$/.test(filePath)),
+          ...packageMatches.filter((filePath) => !/_test\.go$/.test(filePath)),
           ...codebase.groupedFiles.config.slice(0, 8),
           ...codebase.groupedFiles.source.slice(0, 20),
         ]),
@@ -169,6 +248,7 @@ export async function scanRepositoryForIssue({
 
       return RepositoryScanSchema.parse({
         repositoryPath,
+        repositoryTree: buildRepositoryTree(codebase.files.map((file) => file.path)),
         relevantFiles,
         relevantTests,
         projectConventions: [

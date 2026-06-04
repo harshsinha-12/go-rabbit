@@ -128,6 +128,288 @@ function getIssueLabel(issue: GitHubIssueOption) {
   return `#${issue.number} ${issue.title}`
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;")
+}
+
+function getValidationStatus(command: ValidationResult["commands"][number]) {
+  return command.skipped ? "SKIP" : command.passed ? "PASS" : "FAIL"
+}
+
+function renderMarkdownLite(markdown: string) {
+  return escapeHtml(markdown)
+    .split("\n")
+    .map((line) => {
+      if (line.startsWith("## ")) {
+        return `<h3>${line.slice(3)}</h3>`
+      }
+
+      if (line.startsWith("- ")) {
+        return `<li>${line.slice(2)}</li>`
+      }
+
+      if (!line.trim()) {
+        return ""
+      }
+
+      return `<p>${line}</p>`
+    })
+    .join("\n")
+    .replace(/(<li>.*<\/li>\n?)+/g, (match) => `<ul>${match}</ul>`)
+}
+
+function getReportHtml({
+  repositoryFullName,
+  runResult,
+  patchDraft,
+  appliedPatch,
+  validationResult,
+  diffExplanation,
+  prSummary,
+  prUrl,
+  manualPrUrl,
+  terminalEvents,
+}: {
+  repositoryFullName: string
+  runResult: AgentRunResponse
+  patchDraft: PatchDraft | null
+  appliedPatch: ApplyPatchResponse | null
+  validationResult: ValidationResult | null
+  diffExplanation: DiffExplanation | null
+  prSummary: PrSummary
+  prUrl: string | null
+  manualPrUrl: boolean
+  terminalEvents: TerminalEvent[]
+}) {
+  const generatedAt = new Date().toLocaleString()
+  const changedFiles = appliedPatch?.changedFiles ?? patchDraft?.changedFiles ?? []
+  const terminalRows = terminalEvents
+    .map(
+      (event) => `
+        <div class="cli-row cli-${event.status}">
+          <div class="cli-status">${escapeHtml(event.status.toUpperCase())}</div>
+          <div>
+            <p>${escapeHtml(event.message)}</p>
+            ${event.detail ? `<pre>${escapeHtml(event.detail)}</pre>` : ""}
+          </div>
+        </div>
+      `,
+    )
+    .join("")
+  const validationRows =
+    validationResult?.commands
+      .map(
+        (command) => `
+          <tr>
+            <td><span class="badge">${getValidationStatus(command)}</span></td>
+            <td><code>${escapeHtml(command.command)}</code></td>
+            <td>${command.elapsedMs ? `${Math.round(command.elapsedMs / 1000)}s` : "-"}</td>
+          </tr>
+        `,
+      )
+      .join("") ?? ""
+
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${escapeHtml(prSummary.title)} - Go Rabbit Report</title>
+    <style>
+      @page { margin: 18mm; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        color: #15202b;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 12px;
+        line-height: 1.55;
+      }
+      h1, h2, h3, p { margin-top: 0; }
+      h1 { margin-bottom: 8px; font-size: 30px; line-height: 1.1; }
+      h2 {
+        margin: 28px 0 10px;
+        border-bottom: 1px solid #d8dee6;
+        padding-bottom: 6px;
+        color: #0f766e;
+        font-size: 16px;
+        text-transform: uppercase;
+      }
+      h3 { margin: 18px 0 8px; font-size: 14px; }
+      pre, code {
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+      pre {
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+        border: 1px solid #d8dee6;
+        border-radius: 6px;
+        padding: 10px;
+        background: #f4f6f8;
+      }
+      table { width: 100%; border-collapse: collapse; }
+      td, th {
+        border-bottom: 1px solid #d8dee6;
+        padding: 8px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th { color: #607080; font-size: 11px; text-transform: uppercase; }
+      ul { margin-top: 0; padding-left: 18px; }
+      .cover {
+        border-bottom: 3px solid #0f766e;
+        padding-bottom: 16px;
+      }
+      .eyebrow {
+        margin-bottom: 6px;
+        color: #0f766e;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 16px;
+      }
+      .summary-card {
+        border: 1px solid #d8dee6;
+        border-radius: 6px;
+        padding: 10px;
+        background: #fbfcfd;
+      }
+      .summary-card span {
+        display: block;
+        margin-bottom: 4px;
+        color: #607080;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+      .badge {
+        display: inline-block;
+        min-width: 46px;
+        border-radius: 999px;
+        padding: 2px 8px;
+        background: #e8f3f1;
+        color: #0b5f59;
+        font-size: 10px;
+        font-weight: 700;
+        text-align: center;
+      }
+      .cli-row {
+        display: grid;
+        grid-template-columns: 78px minmax(0, 1fr);
+        gap: 10px;
+        break-inside: avoid;
+        border-left: 3px solid #6f7f8f;
+        margin-bottom: 10px;
+        padding-left: 10px;
+      }
+      .cli-completed { border-color: #35c38f; }
+      .cli-failed { border-color: #ff726f; }
+      .cli-skipped { border-color: #f3b44e; }
+      .cli-started { border-color: #6aa6ff; }
+      .cli-status {
+        color: #607080;
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 10px;
+        font-weight: 700;
+      }
+      .small { color: #607080; font-size: 11px; }
+      .page-break { break-before: page; }
+      @media screen {
+        body { background: #edf1f5; }
+        .page {
+          width: min(920px, calc(100% - 32px));
+          margin: 24px auto;
+          border: 1px solid #d8dee6;
+          border-radius: 8px;
+          padding: 32px;
+          background: #ffffff;
+        }
+        .print-note {
+          display: block;
+          margin-bottom: 18px;
+          color: #607080;
+        }
+      }
+      @media print {
+        .print-note { display: none; }
+        .page { padding: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <p class="print-note">Use your browser's Save as PDF option to download this report.</p>
+      <section class="cover">
+        <p class="eyebrow">Go Rabbit Report</p>
+        <h1>${escapeHtml(prSummary.title)}</h1>
+        <p>${escapeHtml(repositoryFullName)} issue #${runResult.issue.number}</p>
+        <p class="small">Generated ${escapeHtml(generatedAt)}</p>
+      </section>
+
+      <section class="summary-grid">
+        <div class="summary-card">
+          <span>Issue</span>
+          <p>${escapeHtml(runResult.issue.title)}</p>
+        </div>
+        <div class="summary-card">
+          <span>Difficulty</span>
+          <p>${escapeHtml(runResult.difficulty.difficulty)}</p>
+        </div>
+        <div class="summary-card">
+          <span>Changed Files</span>
+          <p>${escapeHtml(changedFiles.join(", ") || "None")}</p>
+        </div>
+        <div class="summary-card">
+          <span>PR Link</span>
+          <p>${prUrl ? `<a href="${escapeHtml(prUrl)}">${manualPrUrl ? "Manual PR URL" : "Draft PR"}</a>` : "Not created"}</p>
+        </div>
+      </section>
+
+      <h2>PR Summary</h2>
+      ${renderMarkdownLite(prSummary.body)}
+
+      <h2>Validation</h2>
+      ${
+        validationResult
+          ? `<table><thead><tr><th>Status</th><th>Command</th><th>Elapsed</th></tr></thead><tbody>${validationRows}</tbody></table>`
+          : "<p>Validation was not run.</p>"
+      }
+
+      <h2>Diff Explanation</h2>
+      <p>${escapeHtml(diffExplanation?.summary ?? "No diff explanation available.")}</p>
+      <p>${escapeHtml(diffExplanation?.testNotes ?? "")}</p>
+      <p>${escapeHtml(diffExplanation?.publicApiImpact ?? "")}</p>
+
+      <h2>Patch Rationale</h2>
+      <p>${escapeHtml(patchDraft?.rationale ?? appliedPatch?.rationale ?? "No patch rationale available.")}</p>
+
+      <h2>CLI Trace</h2>
+      ${terminalRows}
+
+      ${
+        appliedPatch?.rawDiff
+          ? `<section class="page-break"><h2>Diff Appendix</h2><pre>${escapeHtml(appliedPatch.rawDiff)}</pre></section>`
+          : ""
+      }
+    </main>
+    <script>
+      window.addEventListener("load", () => {
+        setTimeout(() => window.print(), 250);
+      });
+    </script>
+  </body>
+</html>`
+}
+
 async function readContributorAgentStream({
   response,
   onTrace,
@@ -433,6 +715,49 @@ export function RunSetupForm() {
     }
   }
 
+  function handleDownloadPdfReport() {
+    if (!runResult || !prSummary) {
+      return
+    }
+
+    const reportHtml = getReportHtml({
+      repositoryFullName: selectedRepositoryFullName,
+      runResult,
+      patchDraft,
+      appliedPatch,
+      validationResult,
+      diffExplanation,
+      prSummary,
+      prUrl,
+      manualPrUrl,
+      terminalEvents,
+    })
+    const reportBlob = new Blob([reportHtml], { type: "text/html;charset=utf-8" })
+    const reportUrl = URL.createObjectURL(reportBlob)
+    const reportWindow = window.open(reportUrl, "_blank")
+
+    if (!reportWindow) {
+      const downloadLink = document.createElement("a")
+      downloadLink.href = reportUrl
+      downloadLink.download = "go-rabbit-report.html"
+      downloadLink.click()
+      window.setTimeout(() => URL.revokeObjectURL(reportUrl), 1000)
+      appendTerminal(
+        "completed",
+        "Report download started.",
+        "Open the downloaded HTML file and use Print or Save as PDF.",
+      )
+      return
+    }
+
+    window.setTimeout(() => URL.revokeObjectURL(reportUrl), 60_000)
+    appendTerminal(
+      "completed",
+      "PDF report opened.",
+      "Use Save as PDF in the print dialog to download it.",
+    )
+  }
+
   return (
     <>
       <section className="panel">
@@ -595,6 +920,9 @@ export function RunSetupForm() {
                 <a href={prUrl}>{prUrl}</a>
               </p>
             ) : null}
+            <button onClick={handleDownloadPdfReport} type="button">
+              Download PDF Report
+            </button>
           </div>
         ) : null}
       </section>

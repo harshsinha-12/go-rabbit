@@ -23,7 +23,10 @@ export function getPatchSystemPrompt() {
     "- Do not produce no-op hunks where removed and added lines are identical.",
     "- Do not add comments to go.mod as a substitute for fixing code.",
     "- Do not edit README.md unless the issue is explicitly a documentation issue or README.md is the directly relevant source file.",
+    "- Do not make changelog-only or release-note-only changes unless the issue explicitly asks for release notes. A bug issue needs code and/or test changes.",
     "- Prefer adding or updating a focused test when the issue is a false positive or regression.",
+    "- Use the GitHub issue comments as high-priority maintainer context. If comments mention the real implementation area, follow that over broad docs/changelog guesses.",
+    "- Use the repository tree to pick source/test files near the implementation, not just top-level docs.",
     "- Keep the blast radius small and only touch files needed for the issue.",
     "- Never return prose, analysis, markdown fences, placeholders, or an empty patch.",
     "- If the provided context is insufficient, still return a best-effort valid unified diff grounded only in the provided files.",
@@ -35,11 +38,13 @@ export function getPatchUserPrompt({
   issueTitle,
   issueBody,
   patchFailure,
+  repositoryTree,
   context,
 }: {
   issueTitle: string;
   issueBody: string;
   patchFailure?: string;
+  repositoryTree?: string;
   context: string;
 }) {
   return [
@@ -48,6 +53,9 @@ export function getPatchUserPrompt({
     patchFailure
       ? `Previous patch or validation failure. Fix this exact problem. Do not repeat the same failing diff; generate a revised patch whose hunk context matches the repository file context below:\n${patchFailure}`
       : "",
+    repositoryTree
+      ? `Repository tree:\n${repositoryTree}`
+      : "Repository tree: not available.",
     "Repository file context follows. Treat it as the source of truth.",
     context,
     "",

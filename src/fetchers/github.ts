@@ -25,6 +25,18 @@ export type GitHubIssueResponse = {
   updated_at: string
 }
 
+export type GitHubIssueCommentResponse = {
+  id: number
+  body: string | null
+  html_url: string
+  user: {
+    login: string
+    html_url: string
+  } | null
+  created_at: string
+  updated_at: string
+}
+
 export type GitHubRepositoryResponse = {
   id: number
   name: string
@@ -81,6 +93,28 @@ export async function fetchGitHubIssue(
   }
 
   return (await response.json()) as GitHubIssueResponse
+}
+
+export async function fetchGitHubIssueComments(
+  owner: string,
+  repo: string,
+  issueNumber: number,
+) {
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=50`,
+    {
+      headers: {
+        ...getGitHubHeaders(),
+        Authorization: `Bearer ${getRequiredEnv("GITHUB_TOKEN")}`,
+      },
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch GitHub issue comments: ${response.status}`)
+  }
+
+  return (await response.json()) as GitHubIssueCommentResponse[]
 }
 
 export async function fetchGitHubIssues(owner: string, repo: string) {

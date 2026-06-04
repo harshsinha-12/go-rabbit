@@ -40,6 +40,7 @@ export const DEF_GENERATE_FOCUSED_PATCH: OpenAI.Chat.Completions.ChatCompletionT
           issueTitle: { type: "string" },
           issueBody: { type: "string" },
           filesToInspect: { type: "array", items: { type: "string" } },
+          repositoryTree: { type: "string" },
           retryFailureLog: { type: "string" },
           maxAttempts: { type: "number" },
         },
@@ -76,6 +77,7 @@ export type GenerateFocusedPatchInput = {
   issueTitle: string;
   issueBody: string;
   filesToInspect: string[];
+  repositoryTree?: string;
   retryFailureLog?: string;
   maxAttempts?: number;
   onAttempt?: (attempt: {
@@ -95,15 +97,19 @@ export type ApplyApprovedPatchInput = {
 
 async function readPatchContext(repositoryPath: string, filesToInspect: string[]) {
   const files = await Promise.all(
-    filesToInspect.slice(0, 8).map(async (filePath) => {
+    filesToInspect.slice(0, 18).map(async (filePath) => {
       const result = await readRepositoryFile({
         repositoryPath,
         filePath,
-        maxBytes: 12000,
+        maxBytes: 50000,
       }).catch(() => null);
 
       return result
-        ? `--- ${filePath}\n${result.content}`
+        ? [
+            `--- ${filePath}`,
+            result.truncated ? "[file truncated after 50000 bytes]" : "[full file]",
+            result.content,
+          ].join("\n")
         : `--- ${filePath}\n[failed to read]`;
     }),
   );
@@ -274,6 +280,7 @@ export async function generateFocusedPatch(input: GenerateFocusedPatchInput) {
                 issueTitle: input.issueTitle,
                 issueBody: input.issueBody,
                 patchFailure,
+                repositoryTree: input.repositoryTree,
                 context,
               }),
             },

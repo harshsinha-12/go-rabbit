@@ -1,4 +1,4 @@
-import { fetchGitHubIssue } from "@/fetchers";
+import { fetchGitHubIssue, fetchGitHubIssueComments } from "@/fetchers";
 import { logger, withAgentLogging } from "@/utils";
 import { randomUUID } from "node:crypto";
 import {
@@ -44,11 +44,39 @@ export async function executeIssuePlanningAgent({
         repository.repo,
         issueNumber,
       );
+      const githubIssueComments = await fetchGitHubIssueComments(
+        repository.owner,
+        repository.repo,
+        issueNumber,
+      );
+      const comments = githubIssueComments.map((comment) => ({
+        author: comment.user?.login ?? "unknown",
+        body: comment.body ?? "",
+        url: comment.html_url,
+        createdAt: comment.created_at,
+      }));
+      const issueDiscussion = [
+        githubIssue.body ?? "",
+        comments.length > 0
+          ? [
+              "GitHub issue comments:",
+              ...comments.map((comment, index) =>
+                [
+                  `Comment ${index + 1} by ${comment.author} at ${comment.createdAt}:`,
+                  comment.body,
+                  `URL: ${comment.url}`,
+                ].join("\n"),
+              ),
+            ].join("\n\n")
+          : "GitHub issue comments: none",
+      ].join("\n\n");
 
       const issue = {
         number: githubIssue.number,
         title: githubIssue.title,
-        body: githubIssue.body ?? "",
+        body: issueDiscussion,
+        originalBody: githubIssue.body ?? "",
+        comments,
         labels: githubIssue.labels.map((label) => label.name),
         state: githubIssue.state,
         url: githubIssue.html_url,
@@ -56,7 +84,7 @@ export async function executeIssuePlanningAgent({
 
       const difficulty = classifyIssueDifficulty({
         title: issue.title,
-        body: issue.body,
+        body: issueDiscussion,
         labels: issue.labels,
       });
 
@@ -84,12 +112,12 @@ export async function executeIssuePlanningAgent({
       const repositoryScan = await scanRepositoryForIssue({
         repositoryPath: localRepository.repositoryPath,
         issueTitle: issue.title,
-        issueBody: issue.body,
+        issueBody: issueDiscussion,
       });
 
       const fixPlan = generateFixPlan({
         issueTitle: issue.title,
-        issueBody: issue.body,
+        issueBody: issueDiscussion,
         difficulty,
         repositoryScan,
       });

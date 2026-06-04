@@ -73,8 +73,8 @@ export function generateFixPlan({
 
       const filesToInspect = Array.from(
         new Set([
-          ...repositoryScan.relevantFiles.slice(0, 12),
-          ...repositoryScan.relevantTests.slice(0, 8),
+          ...repositoryScan.relevantFiles.slice(0, 24),
+          ...repositoryScan.relevantTests.slice(0, 16),
         ]),
       );
 

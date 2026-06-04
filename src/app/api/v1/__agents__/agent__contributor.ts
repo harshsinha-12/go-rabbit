@@ -136,6 +136,7 @@ export async function executeContributorAgent(input: ExecuteContributorAgentInpu
           issueTitle: planningResult.issue.title,
           issueBody: planningResult.issue.body,
           filesToInspect: planningResult.fixPlan.filesToInspect,
+          repositoryTree: planningResult.repositoryScan?.repositoryTree,
           maxAttempts: MAX_PATCH_ITERATIONS,
           onAttempt: (attempt) => {
             pushTrace({
@@ -230,6 +231,7 @@ export async function executeContributorAgent(input: ExecuteContributorAgentInpu
             issueTitle: planningResult.issue.title,
             issueBody: planningResult.issue.body,
             filesToInspect: planningResult.fixPlan.filesToInspect,
+            repositoryTree: planningResult.repositoryScan?.repositoryTree,
             retryFailureLog,
             maxAttempts: MAX_PATCH_ITERATIONS,
             onAttempt: (attempt) => {

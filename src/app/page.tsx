@@ -38,6 +38,48 @@ const ARCHITECTURE_DIAGRAM = `flowchart LR
   Summary --> Report
   Summary --> DraftPr --> Fork --> PullRequest`
 
+const SOCIAL_LINKS = [
+  {
+    href: "https://www.linkedin.com/in/harshsinha12/",
+    label: "LinkedIn",
+    name: "harshsinha12",
+  },
+  {
+    href: "https://github.com/harshsinha-12",
+    label: "GitHub",
+    name: "harshsinha-12",
+  },
+  {
+    href: "https://x.com/sinhaharsh12",
+    label: "Twitter",
+    name: "sinhaharsh12",
+  },
+]
+
+function LinkedInIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4.98 3.5a1.98 1.98 0 1 1 0 3.96 1.98 1.98 0 0 1 0-3.96ZM3 8.5h3.96V21H3V8.5Zm6.54 0h3.8v1.71h.05c.53-1 1.83-2.05 3.77-2.05 4.03 0 4.78 2.65 4.78 6.09V21h-3.96v-5.47c0-1.31-.02-3-1.83-3-1.84 0-2.12 1.44-2.12 2.9V21H9.54V8.5Z" />
+    </svg>
+  )
+}
+
+function GitHubIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2.02c-3.22.7-3.9-1.38-3.9-1.38-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.71.08-.71 1.16.08 1.77 1.2 1.77 1.2 1.03 1.77 2.72 1.26 3.39.96.11-.74.4-1.26.73-1.55-2.57-.29-5.28-1.29-5.28-5.73 0-1.27.45-2.31 1.2-3.12-.12-.3-.52-1.48.11-3.08 0 0 .98-.31 3.2 1.19a11.06 11.06 0 0 1 5.83 0c2.22-1.5 3.2-1.19 3.2-1.19.63 1.6.23 2.78.11 3.08.75.81 1.2 1.85 1.2 3.12 0 4.45-2.72 5.43-5.3 5.71.42.36.8 1.08.8 2.18v3.23c0 .31.21.68.8.56A11.5 11.5 0 0 0 12 .5Z" />
+    </svg>
+  )
+}
+
+function TwitterIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M18.9 2H22l-6.78 7.73L23.2 22h-6.27l-4.91-6.33L6.47 22H3.34l7.3-8.32L.8 2h6.42l4.45 5.78L18.9 2Zm-1.1 18h1.72L6.28 3.9H4.44L17.8 20Z" />
+    </svg>
+  )
+}
+
 export default function Home() {
   return (
     <main className="app-shell">
@@ -251,6 +293,44 @@ export default function Home() {
           <RunSetupForm />
         </div>
       </section>
+
+      <footer className="site-footer">
+        <div className="site-footer__brand">
+          <span className="brand-mark__icon">
+            <Image src="/icon.svg" alt="" width={48} height={48} />
+          </span>
+          <div>
+            <p>Go Rabbit</p>
+            <span>Agentic PR workflow for focused Go issues</span>
+          </div>
+        </div>
+
+        <div className="site-footer__links" aria-label="Social links">
+          {SOCIAL_LINKS.map((link) => (
+            <a
+              className="site-footer__link"
+              href={link.href}
+              key={link.href}
+              rel="noreferrer"
+              target="_blank"
+            >
+              <span className="site-footer__icon" aria-hidden="true">
+                {link.label === "LinkedIn" ? (
+                  <LinkedInIcon />
+                ) : link.label === "GitHub" ? (
+                  <GitHubIcon />
+                ) : (
+                  <TwitterIcon />
+                )}
+              </span>
+              <span>
+                <strong>{link.label}</strong>
+                <small>{link.name}</small>
+              </span>
+            </a>
+          ))}
+        </div>
+      </footer>
     </main>
   )
 }

@@ -38,10 +38,7 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family:
-    Arial,
-    Helvetica,
-    sans-serif;
+  font-family: var(--font-display), "Segoe UI", sans-serif;
 }
 
 button,
@@ -524,6 +521,88 @@ select {
   background: var(--panel);
 }
 
+.site-footer {
+  display: flex;
+  width: min(1320px, 100%);
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 56px auto 0;
+  border-top: 1px solid var(--border);
+  padding-top: 28px;
+}
+
+.site-footer__brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.site-footer__brand p {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.site-footer__brand span {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.site-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.site-footer__link {
+  display: inline-flex;
+  min-width: 190px;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: var(--panel);
+  color: var(--foreground);
+  text-decoration: none;
+}
+
+.site-footer__link:hover {
+  border-color: var(--accent);
+  background: var(--GO_RABBIT_SURFACE);
+}
+
+.site-footer__icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.site-footer__icon svg {
+  width: 17px;
+  height: 17px;
+  fill: currentColor;
+}
+
+.site-footer__link strong {
+  display: block;
+  font-size: 14px;
+}
+
+.site-footer__link small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .capability-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -610,6 +689,17 @@ h1,
 h2,
 p {
   margin-top: 0;
+}
+
+h1,
+h2,
+h3,
+.brand-mark,
+.button-link,
+button,
+label,
+.eyebrow {
+  font-family: var(--font-display), "Segoe UI", sans-serif;
 }
 
 h1 {
@@ -860,7 +950,7 @@ button:hover {
   max-height: 720px;
   overflow: auto;
   padding: 12px;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SFMono-Regular", Consolas, monospace;
   font-size: 12px;
   line-height: 1.5;
 }
@@ -959,52 +1049,124 @@ button:hover {
 
 @media (max-width: 760px) {
   .app-shell {
-    padding: 18px;
+    padding: 18px 16px 56px;
+  }
+
+  .workspace,
+  .top-nav,
+  .hero-section,
+  .feature-band,
+  .architecture-section,
+  .capability-section,
+  .report-preview-section,
+  .setup-section {
+    width: 100%;
   }
 
   .top-nav {
+    flex-wrap: wrap;
+  }
+
+  .top-nav__links {
+    gap: 8px;
+  }
+
+  .top-nav__links a {
+    font-size: 12px;
+  }
+
+  .hero-actions {
+    flex-direction: column;
     align-items: flex-start;
   }
 
-  .top-nav,
-  .top-nav__links,
-  .hero-actions {
-    flex-direction: column;
+  .hero-section {
+    gap: 24px;
+    margin-bottom: 56px;
+  }
+
+  .panel,
+  .capability-grid div,
+  .setup-steps div,
+  .feature-item {
+    padding: 18px 16px;
   }
 
   .hero-copy h1 {
-    font-size: 40px;
+    font-size: clamp(34px, 12vw, 52px);
   }
 
-  .hero-metrics,
-  .mockup-body,
-  .feature-band,
-  .capability-grid,
-  .setup-steps {
+  .summary,
+  .capability-section > div > p,
+  .architecture-section > div > p,
+  .report-preview-section > div > p,
+  .setup-section > div > p,
+  .workspace-heading > p {
+    font-size: 15px;
+  }
+
+  .workspace-heading {
+    gap: 18px;
+    margin-bottom: 24px;
+    padding-top: 48px;
+  }
+
+  .terminal-header {
+    flex-wrap: wrap;
+  }
+
+  .terminal-header-meta {
+    min-width: 0;
+  }
+
+  .terminal-copy-button {
+    width: 100%;
+  }
+
+  .terminal-body {
+    min-height: 360px;
+    max-height: 560px;
+    padding: 10px;
+    font-size: 11px;
+  }
+
+  .terminal-line span {
+    min-width: 64px;
+  }
+
+  .mockup-body {
     grid-template-columns: 1fr;
   }
 
-  .report-preview-frame,
+  .mockup-panel--terminal {
+    grid-row: span 1;
+  }
+
+  .architecture-mermaid {
+    padding: 16px;
+  }
+
+  .architecture-mermaid__canvas svg {
+    min-width: 860px;
+  }
+
+  .report-preview-frame {
+    min-height: 360px;
+  }
+
   .report-preview-frame iframe {
-    min-height: 420px;
     height: 420px;
   }
 
-  .feature-item,
-  .feature-item:nth-child(2) {
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
+  .site-footer {
+    padding-top: 20px;
   }
 
-  .feature-item:last-child {
-    border-bottom: 0;
+  .site-footer__links {
+    width: 100%;
   }
 
-  .panel {
-    padding: 18px;
-  }
-
-  .metadata-grid {
-    grid-template-columns: 1fr;
+  .site-footer__link {
+    width: 100%;
   }
 }

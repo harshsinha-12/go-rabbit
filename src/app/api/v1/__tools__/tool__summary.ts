@@ -79,6 +79,8 @@ export function explainDiff({
         testNotes: validationResult
           ? validationResult.passed
             ? "Validation passed."
+            : hasSkippedValidation(validationResult)
+              ? "Validation was skipped after the 2 minute command limit; review the captured logs manually."
             : "Validation failed; inspect captured command logs before continuing."
           : "Validation has not been run yet.",
         publicApiImpact: rawDiff.includes("type ") || rawDiff.includes("func ")
@@ -113,14 +115,25 @@ export function generatePrSummary({
           "## Tests",
           ...validationResult.commands.map(
             (command) =>
-              `- ${command.passed ? "PASS" : "FAIL"} \`${command.command}\``,
+              `- ${getValidationCommandLabel(command)} \`${command.command}\``,
           ),
           "",
           "## Risk Notes",
           validationResult.passed
             ? "- Validation passed."
+            : hasSkippedValidation(validationResult)
+              ? "- Validation timed out after 2 minutes and was skipped; this PR should remain draft until manually validated."
             : "- Validation failed; this PR should remain draft until fixed.",
         ].join("\n"),
       }),
   );
+}
+function hasSkippedValidation(validationResult: ValidationResult | null) {
+  return Boolean(
+    validationResult?.commands.some((command) => command.skipped || command.timedOut),
+  );
+}
+
+function getValidationCommandLabel(command: ValidationResult["commands"][number]) {
+  return command.skipped ? "SKIP" : command.passed ? "PASS" : "FAIL";
 }

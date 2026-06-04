@@ -1,5 +1,6 @@
 export const APPLY_PATCH_ENDPOINT = "/api/v1/runs/apply-patch";
 export const APPROVE_PLAN_ENDPOINT = "/api/v1/runs/approve-plan";
+export const AGENTIC_RUN_ENDPOINT = "/api/v1/runs/agentic";
 export const CREATE_PR_ENDPOINT = "/api/v1/runs/create-pr";
 export const EXPLAIN_DIFF_ENDPOINT = "/api/v1/runs/explain-diff";
 export const GENERATE_PATCH_ENDPOINT = "/api/v1/runs/generate-patch";

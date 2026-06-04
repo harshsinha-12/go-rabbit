@@ -67,6 +67,19 @@ const LARGE_CUES = [
   "unclear",
 ];
 
+const NON_ACTIONABLE_CUES = [
+  "advertisement",
+  "casino",
+  "free on",
+  "giveaway",
+  "imo messenger",
+  "messenger",
+  "promotion",
+  "spam",
+  "telegram",
+  "whatsapp",
+];
+
 const SMALL_CUES = [
   "docs",
   "documentation",
@@ -90,11 +103,24 @@ export function classifyIssueDifficulty({
       logger.debug({ title, labels }, "Classifying issue difficulty");
 
       const text = `${title}\n${body}\n${labels.join(" ")}`.toLowerCase();
+      const nonActionableMatches = NON_ACTIONABLE_CUES.filter((cue) =>
+        text.includes(cue),
+      );
       const largeMatches = LARGE_CUES.filter((cue) => text.includes(cue));
       const smallMatches = SMALL_CUES.filter((cue) => text.includes(cue));
 
       const classification =
-        largeMatches.length > 0
+        nonActionableMatches.length > 0
+          ? {
+              difficulty: "large" as const,
+              shouldBlock: true,
+              reasons: nonActionableMatches.map(
+                (cue) => `Contains non-actionable or spam cue: ${cue}`,
+              ),
+              suggestedUserMessage:
+                "This issue looks non-actionable for a code contributor agent. Go Rabbit should block it instead of generating a patch.",
+            }
+          : largeMatches.length > 0
           ? {
               difficulty: "large" as const,
               shouldBlock: true,

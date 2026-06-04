@@ -1,7 +1,6 @@
-import { DEFAULT_LLM_API_VERSION, GPT_5_2 } from "@/config";
+import { DEFAULT_LLM_API_VERSION, GPT_5_4 } from "@/config";
 import { getAIClient } from "@/fetchers";
 import { logger, withToolLogging } from "@/utils";
-import { getPatchSystemPrompt, getPatchUserPrompt } from "../__prompts__";
 import { execFile } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -9,6 +8,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import OpenAI from "openai";
 import { z } from "zod";
+import { getPatchSystemPrompt, getPatchUserPrompt } from "../__prompts__";
 import { getRepositoryDiff, readRepositoryFile } from "./tool__workspace";
 
 const execFileAsync = promisify(execFile);
@@ -41,6 +41,7 @@ export const DEF_GENERATE_FOCUSED_PATCH: OpenAI.Chat.Completions.ChatCompletionT
           issueBody: { type: "string" },
           filesToInspect: { type: "array", items: { type: "string" } },
           retryFailureLog: { type: "string" },
+          maxAttempts: { type: "number" },
         },
         required: ["repositoryPath", "issueTitle", "issueBody", "filesToInspect"],
         additionalProperties: false,
@@ -76,6 +77,13 @@ export type GenerateFocusedPatchInput = {
   issueBody: string;
   filesToInspect: string[];
   retryFailureLog?: string;
+  maxAttempts?: number;
+  onAttempt?: (attempt: {
+    attempt: number;
+    passed: boolean;
+    error: string;
+    changedFiles: string[];
+  }) => void;
 };
 
 export type ApplyApprovedPatchInput = {
@@ -248,12 +256,13 @@ export async function generateFocusedPatch(input: GenerateFocusedPatchInput) {
         input.repositoryPath,
         input.filesToInspect,
       );
-      const client = getAIClient(GPT_5_2, DEFAULT_LLM_API_VERSION);
+      const client = getAIClient(GPT_5_4, DEFAULT_LLM_API_VERSION);
       let patchFailure = input.retryFailureLog ?? "";
+      const maxAttempts = Math.min(Math.max(input.maxAttempts ?? 5, 1), 5);
 
-      for (let attempt = 1; attempt <= 2; attempt += 1) {
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         const response = await client.chat.completions.create({
-          model: GPT_5_2,
+          model: GPT_5_4,
           messages: [
             {
               role: "system",
@@ -275,11 +284,19 @@ export async function generateFocusedPatch(input: GenerateFocusedPatchInput) {
         const draft = normalizePatchDraft(parsed);
         const patchCheck = await checkPatchApplies(input.repositoryPath, draft.patch);
 
+        input.onAttempt?.({
+          attempt,
+          passed: patchCheck.ok,
+          error: patchCheck.error,
+          changedFiles: draft.changedFiles,
+        });
         logger.debug(
           {
             attempt,
+            maxAttempts,
             contentLength: content.length,
             patchApplies: patchCheck.ok,
+            patchError: patchCheck.error,
           },
           "Generated patch draft",
         );
@@ -292,7 +309,7 @@ export async function generateFocusedPatch(input: GenerateFocusedPatchInput) {
       }
 
       throw new Error(
-        `Generated patch did not apply cleanly after retry. Last git apply error:\n${patchFailure}`,
+        `Generated patch did not apply cleanly after ${maxAttempts} attempt(s). Last git apply error:\n${patchFailure}`,
       );
     },
   );

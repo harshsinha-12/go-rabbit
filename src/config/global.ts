@@ -37,10 +37,11 @@ export const AGENT_RUN_STAGES = [
   "Find relevant files",
   "Read tests",
   "Generate fix plan",
-  "Wait for approval",
+  "Generate patch",
   "Apply patch",
   "Run validation",
+  "Retry once if needed",
   "Explain diff",
   "Draft PR summary",
-  "Create PR with message, diagram, and description",
+  "Manually create PR with message, diagram, and description",
 ] as const;

@@ -16,11 +16,13 @@ export function getPatchSystemPrompt() {
     "",
     "Patch rules:",
     "- The patch must pass `git apply --check` against the exact file contents in the prompt.",
+    "- If a previous `git apply --check` error is provided, do not repeat the same patch; repair the hunk headers and context using the exact current file contents in the prompt.",
     "- Do not invent index hashes. Omit `index ...` lines if unsure.",
     "- Do not invent file content, line numbers, modules, versions, hashes, or checksums.",
     "- Do not edit go.sum unless the issue specifically requires a dependency change and the exact new checksum is known from command output.",
     "- Do not produce no-op hunks where removed and added lines are identical.",
     "- Do not add comments to go.mod as a substitute for fixing code.",
+    "- Do not edit README.md unless the issue is explicitly a documentation issue or README.md is the directly relevant source file.",
     "- Prefer adding or updating a focused test when the issue is a false positive or regression.",
     "- Keep the blast radius small and only touch files needed for the issue.",
     "- Never return prose, analysis, markdown fences, placeholders, or an empty patch.",
@@ -44,7 +46,7 @@ export function getPatchUserPrompt({
     `Issue title:\n${issueTitle}`,
     `Issue body:\n${issueBody || "No issue body provided."}`,
     patchFailure
-      ? `Previous patch or validation failure. Fix this exact problem:\n${patchFailure}`
+      ? `Previous patch or validation failure. Fix this exact problem. Do not repeat the same failing diff; generate a revised patch whose hunk context matches the repository file context below:\n${patchFailure}`
       : "",
     "Repository file context follows. Treat it as the source of truth.",
     context,

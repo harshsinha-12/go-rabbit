@@ -1,22 +1,5 @@
-const approvedRepos = [
-  "gin-gonic/gin",
-  "spf13/cobra",
-  "go-playground/validator",
-  "golangci/golangci-lint",
-]
-
-const traceSteps = [
-  "Parse issue",
-  "Classify difficulty",
-  "Find relevant files",
-  "Read tests",
-  "Generate fix plan",
-  "Wait for approval",
-  "Apply patch",
-  "Run validation",
-  "Explain diff",
-  "Draft PR summary",
-]
+import { RunSetupForm } from "@/app/_components/RunSetupForm"
+import { AGENT_RUN_STAGES } from "@/config"
 
 export default function Home() {
   return (
@@ -32,27 +15,12 @@ export default function Home() {
         </div>
 
         <div className="grid">
-          <section className="panel">
-            <h2>Run Setup</h2>
-            <label>
-              Repository
-              <select defaultValue={approvedRepos[0]}>
-                {approvedRepos.map((repo) => (
-                  <option key={repo}>{repo}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              GitHub issue URL
-              <input placeholder="https://github.com/spf13/cobra/issues/0000" />
-            </label>
-            <button type="button">Prepare Agent Run</button>
-          </section>
+          <RunSetupForm />
 
           <section className="panel">
             <h2>Agent Run Trace</h2>
             <ol className="trace-list">
-              {traceSteps.map((step, index) => (
+              {AGENT_RUN_STAGES.map((step, index) => (
                 <li key={step}>
                   <span>{index + 1}</span>
                   {step}

@@ -147,8 +147,51 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 button:hover {
   background: var(--accent-strong);
+}
+
+.issue-select-label {
+  margin-top: 16px;
+}
+
+.form-message {
+  margin: 14px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.error-message {
+  color: #a33a2c;
+}
+
+.run-result {
+  margin-top: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfcfd;
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.run-result p {
+  margin-bottom: 8px;
+}
+
+.run-result p:last-child {
+  margin-bottom: 0;
+}
+
+.result-kicker {
+  color: var(--foreground);
+  font-weight: 700;
 }
 
 .trace-list {

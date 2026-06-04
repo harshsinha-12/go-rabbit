@@ -1,4 +1,4 @@
-import { logger } from "@/utils";
+import { logger, withToolLogging } from "@/utils";
 import { execFile } from "node:child_process";
 import { readdir, readFile, stat, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -22,6 +22,7 @@ export const TOOL_READ_REPOSITORY_FILE = "readRepositoryFile";
 export const TOOL_WRITE_REPOSITORY_FILE = "writeRepositoryFile";
 export const TOOL_GET_REPOSITORY_DIFF = "getRepositoryDiff";
 
+// This tool is used in the code editing agent workflow to explore the repository file structure, read file contents for context, write proposed changes to files after human approval, and get git diffs of changes before committing. These operations are essential for the agent to understand the codebase it's working with and to make informed edits.
 export const DEF_EXPLORE_CODEBASE: OpenAI.Chat.Completions.ChatCompletionTool =
   {
     type: "function",
@@ -48,6 +49,7 @@ export const DEF_EXPLORE_CODEBASE: OpenAI.Chat.Completions.ChatCompletionTool =
     },
   };
 
+// The read, write, and diff tools are designed to operate only within the bounds of the cloned repository directory for security. They resolve file paths and throw errors if there are attempts to access files outside the repository root. The read tool also truncates file contents that exceed a specified byte limit to avoid flooding the model context with excessively large files.
 export const DEF_READ_REPOSITORY_FILE: OpenAI.Chat.Completions.ChatCompletionTool =
   {
     type: "function",
@@ -79,6 +81,7 @@ export const DEF_READ_REPOSITORY_FILE: OpenAI.Chat.Completions.ChatCompletionToo
     },
   };
 
+// The write and diff tools are intended to be used after the agent has proposed changes and received human approval. The write tool creates or overwrites files in the repository, while the diff tool returns git diffs of changes to help the agent understand the impact of its edits before committing.
 export const DEF_WRITE_REPOSITORY_FILE: OpenAI.Chat.Completions.ChatCompletionTool =
   {
     type: "function",
@@ -109,6 +112,7 @@ export const DEF_WRITE_REPOSITORY_FILE: OpenAI.Chat.Completions.ChatCompletionTo
     },
   };
 
+// The getRepositoryDiff tool is designed to be used after changes have been written to the repository but before they are committed. It returns the current git diff for the entire repository or a specific file, allowing the agent to understand the exact changes that have been made and to generate explanations or summaries of those changes for the human user.
 export const DEF_GET_REPOSITORY_DIFF: OpenAI.Chat.Completions.ChatCompletionTool =
   {
     type: "function",
@@ -275,41 +279,47 @@ export async function exploreCodebase({
   repositoryPath,
   maxFiles = 120,
 }: ExploreCodebaseInput) {
-  logger.debug({ repositoryPath, maxFiles }, "Exploring codebase");
+  return withToolLogging(
+    TOOL_EXPLORE_CODEBASE,
+    { repositoryPath, maxFiles },
+    async () => {
+      logger.debug({ repositoryPath, maxFiles }, "Exploring codebase");
 
-  const repositoryRoot = await assertRepositoryDirectory(repositoryPath);
-  const files: CodebaseFile[] = [];
+      const repositoryRoot = await assertRepositoryDirectory(repositoryPath);
+      const files: CodebaseFile[] = [];
 
-  await collectFiles(repositoryRoot, repositoryRoot, maxFiles, files);
+      await collectFiles(repositoryRoot, repositoryRoot, maxFiles, files);
 
-  const groupedFiles = files.reduce<Record<CodebaseFile["kind"], string[]>>(
-    (groups, file) => {
-      groups[file.kind].push(file.path);
-      return groups;
-    },
-    {
-      config: [],
-      source: [],
-      test: [],
-      style: [],
-      doc: [],
-      other: [],
+      const groupedFiles = files.reduce<Record<CodebaseFile["kind"], string[]>>(
+        (groups, file) => {
+          groups[file.kind].push(file.path);
+          return groups;
+        },
+        {
+          config: [],
+          source: [],
+          test: [],
+          style: [],
+          doc: [],
+          other: [],
+        },
+      );
+
+      logger.debug(
+        {
+          repositoryPath,
+          filesCount: files.length,
+        },
+        "Explored codebase",
+      );
+
+      return {
+        repositoryPath: repositoryRoot,
+        files,
+        groupedFiles,
+      };
     },
   );
-
-  logger.debug(
-    {
-      repositoryPath,
-      filesCount: files.length,
-    },
-    "Explored codebase",
-  );
-
-  return {
-    repositoryPath: repositoryRoot,
-    files,
-    groupedFiles,
-  };
 }
 
 export async function readRepositoryFile({
@@ -317,23 +327,29 @@ export async function readRepositoryFile({
   filePath,
   maxBytes = 20000,
 }: ReadRepositoryFileInput) {
-  logger.debug(
+  return withToolLogging(
+    TOOL_READ_REPOSITORY_FILE,
     { repositoryPath, filePath, maxBytes },
-    "Reading repository file",
+    async () => {
+      logger.debug(
+        { repositoryPath, filePath, maxBytes },
+        "Reading repository file",
+      );
+
+      const { resolvedPath } = resolveInsideRepository(repositoryPath, filePath);
+      const content = await readFile(resolvedPath, "utf8");
+      const truncated = Buffer.byteLength(content, "utf8") > maxBytes;
+      const safeContent = truncated
+        ? Buffer.from(content, "utf8").subarray(0, maxBytes).toString("utf8")
+        : content;
+
+      return {
+        filePath,
+        content: safeContent,
+        truncated,
+      };
+    },
   );
-
-  const { resolvedPath } = resolveInsideRepository(repositoryPath, filePath);
-  const content = await readFile(resolvedPath, "utf8");
-  const truncated = Buffer.byteLength(content, "utf8") > maxBytes;
-  const safeContent = truncated
-    ? Buffer.from(content, "utf8").subarray(0, maxBytes).toString("utf8")
-    : content;
-
-  return {
-    filePath,
-    content: safeContent,
-    truncated,
-  };
 }
 
 export async function writeRepositoryFile({
@@ -341,41 +357,53 @@ export async function writeRepositoryFile({
   filePath,
   content,
 }: WriteRepositoryFileInput) {
-  logger.debug({ repositoryPath, filePath }, "Writing repository file");
+  return withToolLogging(
+    TOOL_WRITE_REPOSITORY_FILE,
+    { repositoryPath, filePath },
+    async () => {
+      logger.debug({ repositoryPath, filePath }, "Writing repository file");
 
-  const { resolvedPath } = resolveInsideRepository(repositoryPath, filePath);
-  await mkdir(path.dirname(resolvedPath), { recursive: true });
-  await writeFile(resolvedPath, content, "utf8");
+      const { resolvedPath } = resolveInsideRepository(repositoryPath, filePath);
+      await mkdir(path.dirname(resolvedPath), { recursive: true });
+      await writeFile(resolvedPath, content, "utf8");
 
-  return {
-    filePath,
-    bytesWritten: Buffer.byteLength(content, "utf8"),
-  };
+      return {
+        filePath,
+        bytesWritten: Buffer.byteLength(content, "utf8"),
+      };
+    },
+  );
 }
 
 export async function getRepositoryDiff({
   repositoryPath,
   filePath,
 }: GetRepositoryDiffInput) {
-  logger.debug({ repositoryPath, filePath }, "Getting repository diff");
+  return withToolLogging(
+    TOOL_GET_REPOSITORY_DIFF,
+    { repositoryPath, filePath },
+    async () => {
+      logger.debug({ repositoryPath, filePath }, "Getting repository diff");
 
-  const repositoryRoot = await assertRepositoryDirectory(repositoryPath);
-  const args = ["-C", repositoryRoot, "diff", "--"];
+      const repositoryRoot = await assertRepositoryDirectory(repositoryPath);
+      const args = ["-C", repositoryRoot, "diff", "--"];
 
-  if (filePath) {
-    resolveInsideRepository(repositoryRoot, filePath);
-    args.push(filePath);
-  }
+      if (filePath) {
+        resolveInsideRepository(repositoryRoot, filePath);
+        args.push(filePath);
+      }
 
-  const { stdout } = await execFileAsync("git", args, {
-    maxBuffer: 1024 * 1024 * 10,
-  });
+      const { stdout } = await execFileAsync("git", args, {
+        maxBuffer: 1024 * 1024 * 10,
+      });
 
-  return {
-    repositoryPath: repositoryRoot,
-    filePath: filePath ?? null,
-    diff: stdout,
-  };
+      return {
+        repositoryPath: repositoryRoot,
+        filePath: filePath ?? null,
+        diff: stdout,
+      };
+    },
+  );
 }
 
 export const exploreCodebaseTool = exploreCodebase;

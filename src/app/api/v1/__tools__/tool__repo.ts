@@ -1,6 +1,6 @@
 import { APPROVED_GO_REPOSITORIES } from "@/config";
 import { fetchGitHubRepository } from "@/fetchers";
-import { logger } from "@/utils";
+import { logger, withToolLogging } from "@/utils";
 import OpenAI from "openai";
 
 export type ApprovedRepositoryName =
@@ -10,6 +10,7 @@ export type ApprovedRepository = (typeof APPROVED_GO_REPOSITORIES)[number];
 
 export const TOOL_FETCH_APPROVED_REPOSITORY = "fetchApprovedRepository";
 
+// This tool is used in the initial step of the agent workflow to validate that the user-selected GitHub repository is on the approved list for Go Rabbit agent runs. It also fetches metadata about the repository from GitHub, which can be used in subsequent steps of the workflow, such as fetching issues or exploring the codebase.
 export const DEF_FETCH_APPROVED_REPOSITORY: OpenAI.Chat.Completions.ChatCompletionTool =
   {
     type: "function",
@@ -56,44 +57,50 @@ export function isApprovedRepository(fullName: string) {
 export async function fetchApprovedRepository({
   fullName,
 }: FetchApprovedRepositoryInput) {
-  logger.debug({ fullName }, "Fetching approved repository");
+  return withToolLogging(
+    TOOL_FETCH_APPROVED_REPOSITORY,
+    { fullName },
+    async () => {
+      logger.debug({ fullName }, "Fetching approved repository");
 
-  const repository = getApprovedRepository(fullName);
+      const repository = getApprovedRepository(fullName);
 
-  if (!repository) {
-    logger.debug({ fullName }, "Rejected unapproved repository");
-    throw new Error(`Repository is not approved for agent runs: ${fullName}`);
-  }
+      if (!repository) {
+        logger.debug({ fullName }, "Rejected unapproved repository");
+        throw new Error(`Repository is not approved for agent runs: ${fullName}`);
+      }
 
-  const githubRepository = await fetchGitHubRepository(
-    repository.owner,
-    repository.repo,
-  );
+      const githubRepository = await fetchGitHubRepository(
+        repository.owner,
+        repository.repo,
+      );
 
-  logger.debug(
-    {
-      fullName,
-      defaultBranch: githubRepository.default_branch,
-      openIssues: githubRepository.open_issues_count,
+      logger.debug(
+        {
+          fullName,
+          defaultBranch: githubRepository.default_branch,
+          openIssues: githubRepository.open_issues_count,
+        },
+        "Fetched approved repository",
+      );
+
+      return {
+        approved: true,
+        repository,
+        githubRepository: {
+          id: githubRepository.id,
+          name: githubRepository.name,
+          fullName: githubRepository.full_name,
+          url: githubRepository.html_url,
+          description: githubRepository.description,
+          defaultBranch: githubRepository.default_branch,
+          language: githubRepository.language,
+          stars: githubRepository.stargazers_count,
+          openIssues: githubRepository.open_issues_count,
+        },
+      };
     },
-    "Fetched approved repository",
   );
-
-  return {
-    approved: true,
-    repository,
-    githubRepository: {
-      id: githubRepository.id,
-      name: githubRepository.name,
-      fullName: githubRepository.full_name,
-      url: githubRepository.html_url,
-      description: githubRepository.description,
-      defaultBranch: githubRepository.default_branch,
-      language: githubRepository.language,
-      stars: githubRepository.stargazers_count,
-      openIssues: githubRepository.open_issues_count,
-    },
-  };
 }
 
 export const fetchApprovedRepositoryTool = fetchApprovedRepository;

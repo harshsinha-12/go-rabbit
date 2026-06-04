@@ -1,3 +1,7 @@
+export * from "./tool__difficulty"
+export * from "./tool__fix_plan"
 export * from "./tool__issue"
+export * from "./tool__local_repo"
 export * from "./tool__repo"
+export * from "./tool__repository_scan"
 export * from "./tool__workspace"

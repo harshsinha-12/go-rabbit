@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { RUNS_ENDPOINT } from "@/config/endpoint";
 import { logger } from "@/utils";
 import { z } from "zod";
 import { executeIssuePlanningAgent } from "../__agents__/agent__issue_planning";
@@ -14,11 +15,11 @@ const CreateRunRequestSchema = z.object({
 
 export async function POST(request: NextRequest) {
   const parsedBody = CreateRunRequestSchema.safeParse(await request.json());
-  logger.info({ route: "/api/v1/runs" }, "Agent run requested");
+  logger.info({ route: RUNS_ENDPOINT }, "Agent run requested");
 
   if (!parsedBody.success) {
     logger.error(
-      { route: "/api/v1/runs", issues: parsedBody.error.issues },
+      { route: RUNS_ENDPOINT, issues: parsedBody.error.issues },
       "Invalid agent run request",
     );
     return NextResponse.json(
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
     const result = await executeIssuePlanningAgent(parsedBody.data);
     logger.info(
       {
-        route: "/api/v1/runs",
+        route: RUNS_ENDPOINT,
         selectedRepositoryFullName: parsedBody.data.selectedRepositoryFullName,
         issueNumber: parsedBody.data.issueNumber,
       },
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     logger.error(
-      { route: "/api/v1/runs", body: parsedBody.data, error },
+      { route: RUNS_ENDPOINT, body: parsedBody.data, error },
       "Agent run failed",
     );
     return NextResponse.json(

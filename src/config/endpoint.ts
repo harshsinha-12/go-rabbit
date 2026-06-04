@@ -1,0 +1,9 @@
+export const APPLY_PATCH_ENDPOINT = "/api/v1/runs/apply-patch";
+export const APPROVE_PLAN_ENDPOINT = "/api/v1/runs/approve-plan";
+export const CREATE_PR_ENDPOINT = "/api/v1/runs/create-pr";
+export const EXPLAIN_DIFF_ENDPOINT = "/api/v1/runs/explain-diff";
+export const GENERATE_PATCH_ENDPOINT = "/api/v1/runs/generate-patch";
+export const PR_SUMMARY_ENDPOINT = "/api/v1/runs/pr-summary";
+export const RETRY_ENDPOINT = "/api/v1/runs/retry";
+export const RUNS_ENDPOINT = "/api/v1/runs";
+export const VALIDATE_ENDPOINT = "/api/v1/runs/validate";

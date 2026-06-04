@@ -1,6 +1,42 @@
+import { MermaidDiagram } from "@/app/_components/MermaidDiagram"
 import { RunSetupForm } from "@/app/_components/RunSetupForm"
 import { AGENT_RUN_STAGES } from "@/config"
 import Image from "next/image"
+
+const ARCHITECTURE_DIAGRAM = `flowchart LR
+  User["User"]
+  UI["Next.js landing page and agent workspace"]
+  RepoIssueApi["Repository and issue APIs"]
+  GitHubRest["GitHub REST API"]
+  RunApi["Contributor run API"]
+  Planner["Issue planning agent"]
+  IssueContext["Issue body and comments"]
+  Clone["Temporary cloned repository"]
+  Scanner["Repository scanner"]
+  Grounding["Repo tree, nearby files, tests, go.mod, README"]
+  PatchLLM["Patch generation LLM"]
+  ApplyPatch["git apply check and patch repair"]
+  Validation["Validation runner with 120s cap"]
+  Repair["LLM repair loop on failed validation"]
+  Summary["Diff explanation and PR summary"]
+  Report["PDF report page"]
+  DraftPr["Draft PR tool"]
+  Fork["User fork remote"]
+  PullRequest["GitHub draft PR or compare URL"]
+
+  User --> UI
+  UI --> RepoIssueApi --> GitHubRest
+  UI --> RunApi --> Planner
+  Planner --> GitHubRest
+  Planner --> IssueContext
+  Planner --> Clone
+  Clone --> Scanner --> Grounding
+  Grounding --> PatchLLM --> ApplyPatch
+  ApplyPatch --> Validation
+  Validation --> Summary
+  Validation -- failure logs --> Repair --> PatchLLM
+  Summary --> Report
+  Summary --> DraftPr --> Fork --> PullRequest`
 
 export default function Home() {
   return (
@@ -14,6 +50,7 @@ export default function Home() {
         </a>
         <div className="top-nav__links">
           <a href="#workflow">Workflow</a>
+          <a href="#architecture">Architecture</a>
           <a href="#setup">Setup</a>
           <a href="#workspace">Run Agent</a>
           <a href="#reporting">Reports</a>
@@ -101,6 +138,21 @@ export default function Home() {
             <p>{stage}</p>
           </div>
         ))}
+      </section>
+
+      <section className="architecture-section" id="architecture">
+        <div>
+          <p className="eyebrow">Architecture</p>
+          <h2>How a selected issue becomes a reviewed patch</h2>
+          <p>
+            The browser stays focused on review and approvals. Server-side
+            tools own GitHub access, temporary repository workspaces, model
+            calls, validation commands, and PR creation.
+          </p>
+        </div>
+        <div className="architecture-diagram" aria-label="Go Rabbit rendered Mermaid architecture diagram">
+          <MermaidDiagram chart={ARCHITECTURE_DIAGRAM} />
+        </div>
       </section>
 
       <section className="capability-section" id="review">

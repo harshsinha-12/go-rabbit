@@ -221,6 +221,17 @@ Current behavior:
 - Does not retry patch generation after a validation timeout.
 - Sends full failed validation logs to the LLM on non-timeout failures.
 
+## Deployment Runtime
+
+The hosted Vercel URL can serve the UI, fetch GitHub issues, render reports, and show the workflow surface. Full contributor runs require a runtime with native CLIs available on `PATH`:
+
+- `git` for clone, fetch, branch checkout, patch checks, diffs, commits, and pushes
+- `gh` for GitHub auth, fork setup, and draft PR creation
+- `go` for Go repository validation
+- `make` when a target repository uses Makefile validation
+
+Vercel serverless functions are not a reliable runtime for the full agent because these binaries may be unavailable and long-running validation work can exceed serverless limits. Run the contributor worker locally or on a VM/container image that installs those tools.
+
 ## PDF Report
 
 After a run produces a PR summary, click `Download PDF Report`.

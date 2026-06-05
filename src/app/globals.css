@@ -318,6 +318,7 @@ select {
 .architecture-section,
 .capability-section,
 .report-preview-section,
+.runtime-section,
 .setup-section {
   width: min(1320px, 100%);
   margin: 0 auto 96px;
@@ -357,6 +358,7 @@ select {
 .capability-section,
 .architecture-section,
 .report-preview-section,
+.runtime-section,
 .setup-section {
   display: grid;
   grid-template-columns: minmax(280px, 0.72fr) minmax(0, 1.28fr);
@@ -369,6 +371,7 @@ select {
 .capability-section h2,
 .architecture-section h2,
 .report-preview-section h2,
+.runtime-section h2,
 .setup-section h2,
 .workspace-heading h2 {
   max-width: 560px;
@@ -380,6 +383,7 @@ select {
 .capability-section > div > p,
 .architecture-section > div > p,
 .report-preview-section > div > p,
+.runtime-section > div > p,
 .setup-section > div > p,
 .workspace-heading > p {
   color: var(--muted);
@@ -519,6 +523,50 @@ select {
   height: 620px;
   border: 0;
   background: var(--panel);
+}
+
+.runtime-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.runtime-grid div {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 22px;
+  background: var(--panel);
+}
+
+.runtime-grid code {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  border-radius: 6px;
+  padding: 0 10px;
+  background: #101820;
+  color: #e7edf3;
+  font-family: var(--font-mono), "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.runtime-grid p {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.runtime-note {
+  grid-column: 2;
+  margin: -64px 0 0;
+  border-left: 3px solid var(--GO_RABBIT_ACCENT_GOLD);
+  padding-left: 14px;
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.65;
 }
 
 .site-footer {
@@ -1008,6 +1056,7 @@ button:hover {
   .capability-section,
   .architecture-section,
   .report-preview-section,
+  .runtime-section,
   .setup-section,
   .workspace-heading {
     grid-template-columns: 1fr;
@@ -1034,6 +1083,7 @@ button:hover {
 @media (max-width: 900px) {
   .feature-band,
   .capability-grid,
+  .runtime-grid,
   .setup-steps {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1059,6 +1109,7 @@ button:hover {
   .architecture-section,
   .capability-section,
   .report-preview-section,
+  .runtime-section,
   .setup-section {
     width: 100%;
   }
@@ -1100,6 +1151,7 @@ button:hover {
   .capability-section > div > p,
   .architecture-section > div > p,
   .report-preview-section > div > p,
+  .runtime-section > div > p,
   .setup-section > div > p,
   .workspace-heading > p {
     font-size: 15px;
@@ -1156,6 +1208,15 @@ button:hover {
 
   .report-preview-frame iframe {
     height: 420px;
+  }
+
+  .runtime-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .runtime-note {
+    grid-column: auto;
+    margin: 0;
   }
 
   .site-footer {

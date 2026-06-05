@@ -94,6 +94,7 @@ export default function Home() {
           <a href="#workflow">Workflow</a>
           <a href="#architecture">Architecture</a>
           <a href="#setup">Setup</a>
+          <a href="#runtime">Runtime</a>
           <a href="#workspace">Run Agent</a>
           <a href="#reporting">Reports</a>
         </div>
@@ -275,6 +276,42 @@ export default function Home() {
             <code>npm run dev</code>
           </div>
         </div>
+      </section>
+
+      <section className="runtime-section" id="runtime">
+        <div>
+          <p className="eyebrow">Deployment runtime</p>
+          <h2>Hosted UI is separate from the contributor worker</h2>
+          <p>
+            The Vercel deployment can serve the interface, fetch GitHub issues,
+            render reports, and show the workflow surface. Full contributor
+            runs need a runtime with native CLIs available on PATH.
+          </p>
+        </div>
+        <div className="runtime-grid">
+          <div>
+            <code>git</code>
+            <p>Clone, fetch, checkout branches, check patches, diff, commit, and push.</p>
+          </div>
+          <div>
+            <code>gh</code>
+            <p>Authenticate GitHub, create or attach forks, and open draft PRs.</p>
+          </div>
+          <div>
+            <code>go</code>
+            <p>Run Go validation commands such as package tests and project checks.</p>
+          </div>
+          <div>
+            <code>make</code>
+            <p>Run Makefile validation when a target repository requires it.</p>
+          </div>
+        </div>
+        <p className="runtime-note">
+          Vercel serverless functions are not a reliable runtime for full agent
+          execution because these binaries may be unavailable and long-running
+          validation can exceed serverless limits. Run the contributor worker
+          locally or on a VM/container image that installs these tools.
+        </p>
       </section>
 
       <section className="workspace">

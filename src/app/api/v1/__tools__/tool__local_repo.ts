@@ -58,6 +58,36 @@ async function exists(directoryPath: string) {
   }
 }
 
+function isMissingExecutableError(error: unknown, executable: string) {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    (error as NodeJS.ErrnoException).code === "ENOENT" &&
+    "path" in error &&
+    (error as NodeJS.ErrnoException).path === executable
+  );
+}
+
+async function assertGitAvailable() {
+  try {
+    await execFileAsync("git", ["--version"], {
+      maxBuffer: 1024 * 1024,
+    });
+  } catch (error) {
+    if (isMissingExecutableError(error, "git")) {
+      throw new Error(
+        [
+          "Contributor runs require the `git` CLI, but this deployment runtime cannot find it.",
+          "The hosted Vercel serverless runtime is not suitable for full agent execution because Go Rabbit clones repositories, applies patches, validates with local commands, and creates PR branches.",
+          "Run the contributor worker in a VM/container with `git`, `gh`, `go`, and `make` installed, or run Go Rabbit locally with those tools on PATH.",
+        ].join("\n"),
+      );
+    }
+
+    throw error;
+  }
+}
+
 export async function prepareLocalRepository({
   runId,
   repositoryUrl,
@@ -79,6 +109,7 @@ export async function prepareLocalRepository({
       );
 
       await mkdir(runPath, { recursive: true });
+      await assertGitAvailable();
 
       if (!(await exists(repositoryPath))) {
         await execFileAsync("git", ["clone", repositoryUrl, repositoryPath], {

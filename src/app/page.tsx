@@ -223,6 +223,7 @@ export default function Home() {
         <div>
           <p className="eyebrow">Report preview</p>
           <h2>Review a saved Go Rabbit PDF report</h2>
+          <h4>Generated on 1st local run</h4>
           <p>
             This sample report shows the output format for an agent run:
             summary, changed files, validation notes, diff explanation, and raw

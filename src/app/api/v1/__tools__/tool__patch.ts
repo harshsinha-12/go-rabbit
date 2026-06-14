@@ -1,4 +1,4 @@
-import { DEFAULT_LLM_API_VERSION, GPT_5_4 } from "@/config";
+import { GPT_5_5 } from "@/config";
 import { getAIClient } from "@/fetchers";
 import { logger, withToolLogging } from "@/utils";
 import { execFile } from "node:child_process";
@@ -262,13 +262,13 @@ export async function generateFocusedPatch(input: GenerateFocusedPatchInput) {
         input.repositoryPath,
         input.filesToInspect,
       );
-      const client = getAIClient(GPT_5_4, DEFAULT_LLM_API_VERSION);
+      const client = getAIClient(GPT_5_5);
       let patchFailure = input.retryFailureLog ?? "";
       const maxAttempts = Math.min(Math.max(input.maxAttempts ?? 5, 1), 5);
 
       for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         const response = await client.chat.completions.create({
-          model: GPT_5_4,
+          model: GPT_5_5,
           messages: [
             {
               role: "system",
